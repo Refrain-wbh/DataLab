@@ -1,7 +1,7 @@
 /* 
  * CS:APP Data Lab 
  * 
- * <Please put your name and userid here>
+ * wbh
  * 
  * bits.c - Source file with your solutions to the Lab.
  *          This is the file you will hand in to your instructor.
@@ -143,7 +143,9 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return 2;
+    int lefts = x & ~y;
+    int rights = y & ~x;
+    return ~(~lefts & ~rights);
 }
 /* 
  * tmin - return minimum two's complement integer 
@@ -152,9 +154,7 @@ int bitXor(int x, int y) {
  *   Rating: 1
  */
 int tmin(void) {
-
-  return 2;
-
+	return 1 << 31;
 }
 //2
 /*
@@ -165,7 +165,9 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  return 2;
+	int minus1 = x + x + 1;
+	
+	return (!~minus1)&(!~x);
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -176,7 +178,10 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+	int temp = 0xAA;
+	int masking = (temp << 8 + temp) << 8;
+	masking = (masking << 16) + masking;
+	return !((masking & x)^masking);
 }
 /* 
  * negate - return -x 
@@ -186,7 +191,7 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+	return ~x + 1;
 }
 //3
 /* 
@@ -199,7 +204,10 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+	int leftnum = ~(0x30)+1+x;//leftnum>=0 while rightnum<0
+	int rightnum = ~(0x3A)+1+x;
+	int Tmin = 1 << 31;
+	return !!(Tmin & leftnum) & !(Tmin & rightnum);
 }
 /* 
  * conditional - same as x ? y : z 
@@ -209,7 +217,11 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+	//可以用x的条件生成掩模0000 或者 1111 从而与y-z相与，决定是否要加上y-z
+	int negz = ~z + 1;
+	int masking = ~!!x+1;
+	int yminusz = y + negz;
+	return z + masking & yminusz;//z+(x?y-z):0
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -219,6 +231,8 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
+	int yminusx = y + (~x + 1);
+	
   return 2;
 }
 //4
