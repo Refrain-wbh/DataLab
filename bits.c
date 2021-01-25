@@ -218,7 +218,7 @@ int isAsciiDigit(int x) {
 int conditional(int x, int y, int z) {
 	//可以用x的条件生成掩模0000 或者 1111 从而与y-z相与，决定是否要加上y-z
 	int negz = ~z + 1;
-  int boolx = !!x;
+    int boolx = !!x;
 	int masking = ~boolx+1;
 	int yminusz = y + negz;
 	return z + (masking & yminusz);//z+(x?y-z):0
@@ -274,8 +274,10 @@ int logicalNeg(int x) {
  */
 int howManyBits(int x) {
   //分块思想，考虑x右移几位达到-1或者0（取决于符号位）,这个数+1就是结果（这个加一是符号位）
+  //将x右移t位，如果x已经成为-1或者0，说明其有可能移动多了，
+  //所以放弃，但是也可能就是要移动这么多  因而需要在b0的时候补充一下
   int sign = x >> 31;
-  int b16, b8, b4, b2, b1;
+  int b16, b8, b4, b2, b1,b0;
   b16 = !!((x >> 16) ^ sign) << 4;//b16为16表示bit至少为16
   x = x >> b16;
   b8 = !!((x >> 8) ^ sign) << 3;
@@ -286,7 +288,8 @@ int howManyBits(int x) {
   x = x >> b2;
   b1 = !!((x >> 1) ^ sign);
   x = x >> b1;
-  return (b16 + b8 + b4 + b2 + b1 + 1);
+  b0 = !!(x ^ sign);
+  return (b16 + b8 + b4 + b2 + b1+b0 + 1);
 }
 //float
 /* 
@@ -310,7 +313,7 @@ unsigned floatScale2(unsigned uf) {
     frac <<= 1;
     if (frac >= 0x7fffff){
       exp += 1;
-      frac = frac & 0xff;
+      frac = frac & 0x7fffff;
     }      
   }else {
     exp += 1;
