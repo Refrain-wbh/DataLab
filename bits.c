@@ -166,8 +166,7 @@ int tmin(void) {
  */
 int isTmax(int x) {
 	int minus1 = x + x + 1;
-	
-	return (!~minus1)&(!~x);
+	return (!~minus1)&(!!~x);
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -179,7 +178,7 @@ int isTmax(int x) {
  */
 int allOddBits(int x) {
 	int temp = 0xAA;
-	int masking = (temp << 8 + temp) << 8;
+	int masking = ((temp << 8) + temp);
 	masking = (masking << 16) + masking;
 	return !((masking & x)^masking);
 }
@@ -207,7 +206,7 @@ int isAsciiDigit(int x) {
 	int leftnum = ~(0x30)+1+x;//leftnum>=0 while rightnum<0
 	int rightnum = ~(0x3A)+1+x;
 	int Tmin = 1 << 31;
-	return !!(Tmin & leftnum) & !(Tmin & rightnum);
+	return !(Tmin & leftnum) & !!(Tmin & rightnum);
 }
 /* 
  * conditional - same as x ? y : z 
@@ -219,9 +218,10 @@ int isAsciiDigit(int x) {
 int conditional(int x, int y, int z) {
 	//可以用x的条件生成掩模0000 或者 1111 从而与y-z相与，决定是否要加上y-z
 	int negz = ~z + 1;
-	int masking = ~!!x+1;
+  int boolx = !!x;
+	int masking = ~boolx+1;
 	int yminusz = y + negz;
-	return z + masking & yminusz;//z+(x?y-z):0
+	return z + (masking & yminusz);//z+(x?y-z):0
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -231,9 +231,16 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-	int yminusx = y + (~x + 1);
-	
-  return 2;
+  //问题的关键在于y-x可能存在溢出或者x是Tmin导致-x和+x相同，可以将两者都缩小一倍，就可以避免这两种
+  //复杂情况的讨论，如果y-x最后结果为0，则只需要比较y和x的最后一位即可
+  int binx = x >> 1;
+  int biny = y >> 1;
+  int binyminusbinx = biny + (~binx + 1);
+  int lowyminuslowx = (y & 0x01) + (~(x & 0x01) + 1);
+  int not_binyminusbinx = !binyminusbinx;
+  int masking = ~(not_binyminusbinx) + 1;
+  int ans = binyminusbinx + (masking & lowyminuslowx);
+  return !(ans >> 31);
 }
 //4
 /* 
@@ -245,7 +252,13 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+  //0具有和Tmin和Tmax相加都不溢出的特性
+  int Tmin = 1 << 31;
+  int Tmax = ~Tmin;
+  int Tminaddx = Tmin + x;
+  int Tmaxaddx = Tmax + x;
+  //Tminaddx符号位应该为1，Tmaxaddx应该为0
+  return ((Tminaddx >> 31) & ~(Tmaxaddx >> 31)) & 0x01;
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -260,7 +273,20 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  return 0;
+  //分块思想，考虑x右移几位达到-1或者0（取决于符号位）,这个数+1就是结果（这个加一是符号位）
+  int sign = x >> 31;
+  int b16, b8, b4, b2, b1;
+  b16 = !!((x >> 16) ^ sign) << 4;//b16为16表示bit至少为16
+  x = x >> b16;
+  b8 = !!((x >> 8) ^ sign) << 3;
+  x = x >> b8;
+  b4 = !!((x >> 4) ^ sign) << 2;
+  x = x >> b4;
+  b2 = !!((x >> 2) ^ sign) << 1;
+  x = x >> b2;
+  b1 = !!((x >> 1) ^ sign);
+  x = x >> b1;
+  return (b16 + b8 + b4 + b2 + b1 + 1);
 }
 //float
 /* 
@@ -275,7 +301,23 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  return 2;
+  unsigned exp = (uf >> 23)&(0xff);
+  unsigned frac = uf & 0x7fffff;
+  unsigned sign = (uf >> 31) ? 1 : 0;
+  if(exp==0xff){
+    return uf;
+  }else if(exp==0x00){
+    frac <<= 1;
+    if (frac >= 0x7fffff){
+      exp += 1;
+      frac = frac & 0xff;
+    }      
+  }else {
+    exp += 1;
+    if (exp == 0xff)
+      frac = 0;
+  }
+  return (sign << 31) | (exp << 23) | (frac);
 }
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
@@ -290,7 +332,23 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+  unsigned exp = (uf >> 23)&(0xff);
+  unsigned frac = uf & 0x7fffff;
+  unsigned sign = (uf >> 31) ? 1 : 0;
+  if (exp == 255)
+    return 0x80000000u;
+  else if (exp <127)
+    return 0;
+  else {
+    frac |= 0x800000;
+    if (exp <= 150)
+      frac >>= (150 - exp);
+    else if (exp <= 157)
+      frac <<= (157 - exp);
+    else
+      return 0x80000000u;
+  }
+  return sign ? -frac : frac;
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
@@ -306,5 +364,16 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+    //分成四个部分考虑，分别是溢出、正常返回、nomormal和0
+    int sign=0,frac=0,exp=0;
+    if(x>127)
+      exp=0xff;
+    else if(x<=-150)
+      ;
+    else if(x>=-126)
+      exp=x+127;
+    else {
+      frac=1<<(22-(-127-x));
+    }
+    return (sign<<31)|(exp<<23)|frac;
 }
